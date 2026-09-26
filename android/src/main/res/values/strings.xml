@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SuperVideo</string>
+    <string name="progress_channel_name">Upscaling progress</string>
+    <string name="result_channel_name">Finished jobs</string>
+    <string name="cancel">Cancel</string>
+</resources>

@@ -1,52 +1,44 @@
-# SuperImage
-**Sharpen your low-resolution pictures with the power of AI upscaling**<br/><br/>
-SuperImage is a neural network based image upscaling application for Android built with the [MNN deep learning framework](https://github.com/alibaba/MNN) and [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN).<br/><br/>
+# SuperVideo
 
-The input image is processed in tiles on the device GPU, using a pre-trained Real-ESRGAN model. The tiles are then merged into the final high-resolution image. This application requires Vulkan or OpenCL support and Android 7 or above
+AI video upscaler for Android (arm64) and Windows (x64), forked from
+[SuperImage](https://github.com/Lucchetto/SuperImage).
 
-<a href='https://play.google.com/store/apps/details?id=com.zhenxiang.superimage'><img height="80" alt='Get it on Google Play' src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png'/></a>
-<a href='https://f-droid.org/packages/com.zhenxiang.superimage/'><img height="80" alt='Get it on F-Droid' src='https://fdroid.gitlab.io/artwork/badge/get-it-on.png'/></a>
+Video in → streaming decode → per-frame Real-ESRGAN upscale (MNN, Vulkan/OpenCL/CPU) → H.264/HEVC
+encode in checkpointed segments → MP4 with the source audio stream-copied and every frame
+timestamp preserved (VFR included).
 
-Or get the latest APK from the [Releases Section](https://github.com/Lucchetto/SuperImage/releases/latest).
+## Features
 
-## 🖼 Samples
-<div>
-  <img src="assets/sample_1.jpg">
-  <img src="assets/sample_2.jpg">
-  <img src="assets/sample_3.jpg">
-</div>
+- Models: Real-ESRGAN general v3 ×2/×4 and anime video v3 ×4 (fast, SRVGG), plus the RRDB
+  x2plus/x4plus/x4plus-anime models (very slow, short clips).
+- One reusable inference session per job; tunable tile size, tile padding, backend
+  (Auto/Vulkan/OpenCL/CPU), precision (FP16/FP32) and threads.
+- Single-frame before/after preview with measured speed and projected job time.
+- Trim range, codec (H.264/HEVC), CRF or bitrate, x264/x265 preset, target output height.
+- Resume after the app is killed: DONE segments are kept, decoding restarts after the last encoded frame.
+- Sequential job queue; Android pauses on severe thermal status or low battery.
 
-## 📊 Benchmarks
-Results on Qualcomm Snapdragon 855 (Vulkan)
-| Mode          | Input resolution | Output resolution | Execution time    |
-| ------------- | ---------------- | ----------------- | ----------------- |
-| 4x (generic)  | 1920x1080        | 3840x2160         | 3 minutes         |
-| 16x (generic) | 1920x1080        | 7680x4320         | 11 minutes        |
-| 16x (drawing) | 1920x1080        | 7680x4320         | 3 mins 42 seconds |
+## Layout
 
-## 📱 Screenshots
-<p>
-  <span>&nbsp;</span>
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot_light.png" width="230">
-  <span>&nbsp;&nbsp;</span>
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot_dark.png" width="230">
-  <span>&nbsp;</span>
-</p>
+| Path | Contents |
+| --- | --- |
+| `native/core` | C++ upscaler (MNN session reuse, tiling, JNI), MNN + Eigen submodules |
+| `native/models` | `.mnn` model files |
+| `native/android` | Android library building `librealesrgan.so` + MNN backends |
+| `core` | Kotlin/JVM pipeline: FFmpeg (bytedeco) decode/encode/remux, jobs, settings |
+| `ui` | Compose Multiplatform screens shared by both apps |
+| `android` | Android app (WorkManager foreground worker) |
+| `desktop` | Compose Desktop app for Windows (MinGW-built `realesrgan.dll`) |
+| `tools` | Model conversion (PyTorch → ONNX → MNN 2.4.3) |
 
-## 💬 Community
-You can join the [Telegram group](https://t.me/super_image) for support, discussions about AI image processing, and off-topic stuff
+## Building
 
-## 協 Contribute
-You can submit feedbacks or bug reports by [opening an issue](https://github.com/Lucchetto/SuperImage/issues/new). Pull requests are welcome !
+See `AGENTS.md` for prerequisites. `.\gradlew.bat packageExecutables` builds the APKs and the
+Windows app into `executables/`.
 
-## 📚 TODO
-- Support images with transparency
-- Batch processing
-- Web and desktop versions
+## Credits and license
 
-## 📝 Credits
-- Pre-trained models and original implementation from [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
-- Pictures by [Satoshi Hirayama](https://www.pexels.com/photo/yasaka-pagoda-in-kyoto-7526805), [Skitterphoto](https://www.pexels.com/photo/food-japanese-food-photography-sushi-9210), [天江ひなた](https://www.pixiv.net/en/artworks/103802719) and [Ryutaro Tsukata](https://www.pexels.com/photo/an-illuminated-lanterns-on-the-street-5745029)
-
-## ⚖️ License
-SuperImage is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html)
+GPLv3 (see `LICENSE`). Based on SuperImage by Zhenxiang Chen. Models by
+[Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) (BSD-3-Clause), inference by
+[MNN](https://github.com/alibaba/MNN) (Apache-2.0), video I/O by FFmpeg (GPL build) through
+[bytedeco JavaCPP presets](https://github.com/bytedeco/javacpp-presets).
