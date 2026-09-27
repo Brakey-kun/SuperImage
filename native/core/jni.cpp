@@ -53,6 +53,8 @@ Java_com_supervideo_core_upscale_NativeUpscaler_createSession(
         return -static_cast<jlong>(e.error);
     } catch (const std::bad_alloc&) {
         return -CreateBackendFailed;
+    } catch (...) {
+        return -CreateInterpreterFailed;
     }
 }
 
@@ -91,15 +93,20 @@ Java_com_supervideo_core_upscale_NativeUpscaler_upscaleFrame(
     PixelMatrix out(out_address, static_cast<Eigen::Index>(session->height) * session->scale,
                     static_cast<Eigen::Index>(session->width) * session->scale);
 
-    return upscale_frame(
-            *session->interpreter,
-            session->scale,
-            session->padding,
-            in,
-            out,
-            [env, cancel_flag, get_method]() {
-                return env->CallBooleanMethod(cancel_flag, get_method) == JNI_TRUE;
-            });
+    try {
+        return upscale_frame(
+                *session->interpreter,
+                session->scale,
+                session->padding,
+                in,
+                out,
+                [env, cancel_flag, get_method]() {
+                    return env->CallBooleanMethod(cancel_flag, get_method) == JNI_TRUE;
+                });
+    } catch (...) {
+        // Never let a C++ exception unwind through the JNI frame.
+        return CreateBackendFailed;
+    }
 }
 
 JNIEXPORT jint JNICALL

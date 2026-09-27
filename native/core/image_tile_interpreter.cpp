@@ -59,7 +59,7 @@ ImageTileInterpreter::ImageTileInterpreter(
     backendConfig.power = MNN::BackendConfig::Power_High;
     backendConfig.precision = precision_mode(precision);
     config.backendConfig = &backendConfig;
-    config.numThread = threads > 0 ? threads : static_cast<int>(std::thread::hardware_concurrency());
+    const int cpu_threads = threads > 0 ? threads : static_cast<int>(std::thread::hardware_concurrency());
 
     interpreter = MNN::Interpreter::createFromBuffer(model->data(), model->size());
     if (interpreter == nullptr) {
@@ -69,6 +69,10 @@ ImageTileInterpreter::ImageTileInterpreter(
     for (const auto& [type, backup] : backend_candidates(backend)) {
         config.type = type;
         config.backupType = backup;
+        // For GPU backends MNN reads numThread as an MNNGpuMode bitmask, not a thread count.
+        config.numThread = type == MNN_FORWARD_CPU
+                ? cpu_threads
+                : (MNN_GPU_TUNING_WIDE | MNN_GPU_MEMORY_IMAGE);
         session = interpreter->createSession(config);
         if (session != nullptr) {
             break;

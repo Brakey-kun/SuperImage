@@ -25,6 +25,13 @@ android {
         }
     }
 
+    buildTypes {
+        // Debug MNN (-O0) is many times slower; ship optimized natives in every variant.
+        debug {
+            externalNativeBuild { cmake { arguments += "-DCMAKE_BUILD_TYPE=Release" } }
+        }
+    }
+
     externalNativeBuild {
         cmake {
             path = file("../core/CMakeLists.txt")

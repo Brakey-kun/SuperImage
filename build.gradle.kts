@@ -30,6 +30,9 @@ tasks.register<Sync>("packageExecutables") {
     doLast {
         val zip = executablesDir.file("SuperVideo-windows-x64.zip").asFile
         val base = executablesDir.dir("SuperVideo-windows-x64").asFile
+        for (apk in listOf("SuperVideo-release.apk", "SuperVideo-debug.apk")) {
+            check(executablesDir.file(apk).asFile.isFile) { "$apk missing from $executablesDir" }
+        }
         check(File(base, "SuperVideo.exe").isFile) { "SuperVideo.exe missing from $base" }
         ant.withGroovyBuilder {
             "zip"("destfile" to zip, "basedir" to base)

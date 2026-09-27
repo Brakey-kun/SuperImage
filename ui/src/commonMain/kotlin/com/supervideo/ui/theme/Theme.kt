@@ -36,6 +36,13 @@ private val LightColors = lightColorScheme(
     surfaceTint = white,
     outlineVariant = md_theme_light_outlineVariant,
     scrim = md_theme_light_scrim,
+    surfaceBright = white,
+    surfaceDim = white,
+    surfaceContainer = white,
+    surfaceContainerLow = white,
+    surfaceContainerLowest = white,
+    surfaceContainerHigh = white,
+    surfaceContainerHighest = white,
 )
 
 private val DarkColors = darkColorScheme(
@@ -68,6 +75,13 @@ private val DarkColors = darkColorScheme(
     surfaceTint = black,
     outlineVariant = md_theme_dark_outlineVariant,
     scrim = md_theme_dark_scrim,
+    surfaceBright = black,
+    surfaceDim = black,
+    surfaceContainer = black,
+    surfaceContainerLow = black,
+    surfaceContainerLowest = black,
+    surfaceContainerHigh = black,
+    surfaceContainerHighest = black,
 )
 
 @Composable
