@@ -4,10 +4,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeImageBitmap
 import com.supervideo.ui.PlatformUi
+import com.supervideo.core.util.AppLog
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.ImageInfo
+import java.awt.Desktop
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -16,6 +18,15 @@ import java.nio.ByteBuffer
 class DesktopPlatformUi(private val window: () -> Frame?) : PlatformUi {
 
     override val versionName: String = "0.1.0"
+
+    override val logsActionLabel: String = "Open logs folder"
+
+    override fun openLogs() {
+        val dir = AppLog.logDir ?: return
+        if (Desktop.isDesktopSupported()) {
+            Thread { runCatching { Desktop.getDesktop().open(dir) } }.start()
+        }
+    }
 
     @Composable
     override fun rememberVideoPicker(onPicked: (uri: String, displayName: String) -> Unit): () -> Unit = {

@@ -3,7 +3,11 @@
 #include <jni.h>
 
 #include <cstdint>
+#include <cstdio>
+#include <exception>
 #include <new>
+
+#include "native_log.h"
 
 #include "session.h"
 #include "upscaling.h"
@@ -14,6 +18,14 @@ constexpr int kMinTileSize = 16;
 
 UpscaleSession* from_handle(jlong handle) {
     return reinterpret_cast<UpscaleSession*>(static_cast<intptr_t>(handle));
+}
+
+/** Stores [code] in error_out[0] and returns the "no session" handle. */
+jlong fail(JNIEnv* env, jintArray error_out, jint code) {
+    if (error_out != nullptr && env->GetArrayLength(error_out) > 0) {
+        env->SetIntArrayRegion(error_out, 0, 1, &code);
+    }
+    return 0;
 }
 
 }
@@ -32,10 +44,13 @@ Java_com_supervideo_core_upscale_NativeUpscaler_createSession(
         jint tile_padding,
         jint backend,
         jint precision,
-        jint threads) {
+        jint threads,
+        jintArray error_out) {
+    // The handle is an opaque pointer: on arm64 Android heap pointers are tagged in the top
+    // byte and read as negative jlongs, so errors are reported via error_out, never the sign.
     if (model == nullptr || scale <= 0 || frame_width <= 0 || frame_height <= 0 ||
         tile_size < kMinTileSize || tile_padding < 0 || tile_padding * 2 >= tile_size) {
-        return -InvalidArgs;
+        return fail(env, error_out, InvalidArgs);
     }
     try {
         auto session = UpscaleSession::create(
@@ -50,11 +65,16 @@ Java_com_supervideo_core_upscale_NativeUpscaler_createSession(
                 threads);
         return static_cast<jlong>(reinterpret_cast<intptr_t>(session.release()));
     } catch (const ImageTileInterpreterException& e) {
-        return -static_cast<jlong>(e.error);
+        return fail(env, error_out, e.error);
     } catch (const std::bad_alloc&) {
-        return -CreateBackendFailed;
+        SV_LOG("createSession: out of memory");
+        return fail(env, error_out, CreateBackendFailed);
+    } catch (const std::exception& e) {
+        SV_LOG("createSession: unexpected exception: %s", e.what());
+        return fail(env, error_out, NativeException);
     } catch (...) {
-        return -CreateInterpreterFailed;
+        SV_LOG("createSession: unknown exception");
+        return fail(env, error_out, NativeException);
     }
 }
 
@@ -103,9 +123,13 @@ Java_com_supervideo_core_upscale_NativeUpscaler_upscaleFrame(
                 [env, cancel_flag, get_method]() {
                     return env->CallBooleanMethod(cancel_flag, get_method) == JNI_TRUE;
                 });
-    } catch (...) {
+    } catch (const std::exception& e) {
         // Never let a C++ exception unwind through the JNI frame.
-        return CreateBackendFailed;
+        SV_LOG("upscaleFrame: unexpected exception: %s", e.what());
+        return NativeException;
+    } catch (...) {
+        SV_LOG("upscaleFrame: unknown exception");
+        return NativeException;
     }
 }
 
@@ -124,6 +148,33 @@ Java_com_supervideo_core_upscale_NativeUpscaler_destroySession(
         jobject /* this */,
         jlong handle) {
     delete from_handle(handle);
+}
+
+/**
+ * Appends native stdout/stderr (MNN_PRINT/MNN_ERROR and SV_LOG) to [path]. Used by the desktop app,
+ * where native output otherwise goes nowhere; Android native output already reaches logcat.
+ */
+JNIEXPORT jboolean JNICALL
+Java_com_supervideo_core_upscale_NativeUpscaler_redirectNativeOutput(
+        JNIEnv* env,
+        jobject /* this */,
+        jstring path) {
+#ifdef _WIN32
+    const jchar* chars = env->GetStringChars(path, nullptr);
+    const auto* wide = reinterpret_cast<const wchar_t*>(chars);
+    const bool out_ok = _wfreopen(wide, L"a", stdout) != nullptr;
+    const bool err_ok = _wfreopen(wide, L"a", stderr) != nullptr;
+    env->ReleaseStringChars(path, chars);
+#else
+    const char* chars = env->GetStringUTFChars(path, nullptr);
+    const bool out_ok = std::freopen(chars, "a", stdout) != nullptr;
+    const bool err_ok = std::freopen(chars, "a", stderr) != nullptr;
+    env->ReleaseStringUTFChars(path, chars);
+#endif
+    // Unbuffered so a native crash does not lose the last lines.
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
+    std::setvbuf(stderr, nullptr, _IONBF, 0);
+    return out_ok && err_ok ? JNI_TRUE : JNI_FALSE;
 }
 
 }

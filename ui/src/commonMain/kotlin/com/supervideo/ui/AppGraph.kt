@@ -13,6 +13,12 @@ import java.nio.ByteBuffer
 interface PlatformUi {
     val versionName: String
 
+    /** Label of the Settings action that hands the logs to the user ("Open logs folder" / "Share logs"). */
+    val logsActionLabel: String
+
+    /** Opens the logs folder (desktop) or shares the collected logs (Android). */
+    fun openLogs()
+
     /** Returns a launcher that opens the platform video picker; [onPicked] gets (uri or path, display name). */
     @Composable
     fun rememberVideoPicker(onPicked: (uri: String, displayName: String) -> Unit): () -> Unit

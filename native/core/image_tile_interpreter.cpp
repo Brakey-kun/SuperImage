@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "image_tile_interpreter.h"
+#include "native_log.h"
 
 namespace {
 
@@ -63,6 +64,7 @@ ImageTileInterpreter::ImageTileInterpreter(
 
     interpreter = MNN::Interpreter::createFromBuffer(model->data(), model->size());
     if (interpreter == nullptr) {
+        SV_LOG("createFromBuffer failed (model %zu bytes)", model->size());
         throw ImageTileInterpreterException(CreateInterpreterFailed);
     }
 
@@ -77,8 +79,10 @@ ImageTileInterpreter::ImageTileInterpreter(
         if (session != nullptr) {
             break;
         }
+        SV_LOG("createSession failed for forward type %d (backup %d)", static_cast<int>(type), static_cast<int>(backup));
     }
     if (session == nullptr) {
+        SV_LOG("no backend available (requested %d)", backend);
         release();
         throw ImageTileInterpreterException(CreateBackendFailed);
     }
@@ -97,6 +101,8 @@ ImageTileInterpreter::ImageTileInterpreter(
     int backend_types[4] = {MNN_FORWARD_CPU, MNN_FORWARD_CPU, MNN_FORWARD_CPU, MNN_FORWARD_CPU};
     interpreter->getSessionInfo(session, MNN::Interpreter::BACKENDS, backend_types);
     active_backend = backend_types[0];
+    SV_LOG("session ready: requested %d, active forward type %d, precision %d, tile %dx%d, scale %d",
+           backend, active_backend, precision, tile_dimensions.width, tile_dimensions.height, scale);
 
     const auto out_shape = interpreter_output->shape();
     if (out_shape.size() != 4 ||

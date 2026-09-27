@@ -6,6 +6,7 @@ import com.supervideo.core.job.JobRunner
 import com.supervideo.core.job.JobService
 import com.supervideo.core.job.JobStatus
 import com.supervideo.core.pipeline.JobProgress
+import com.supervideo.core.util.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,7 +40,7 @@ class DesktopJobRunner(private val service: JobService) : JobRunner {
                     service.execute(jobId, flowFor(jobId), cancel)
                 } catch (e: Throwable) {
                     // Saved as FAILED by the pipeline; keep the queue running.
-                    e.printStackTrace()
+                    AppLog.e("Jobs", "Job $jobId ended with an error", e)
                 } finally {
                     cancelFlags.remove(jobId)
                 }

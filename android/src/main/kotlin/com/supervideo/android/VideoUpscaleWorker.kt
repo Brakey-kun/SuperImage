@@ -12,7 +12,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
-import android.util.Log
+import com.supervideo.core.util.AppLog
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -64,10 +64,15 @@ class VideoUpscaleWorker(context: Context, params: WorkerParameters) : Coroutine
             val updates = launch {
                 var lastUpdate = 0L
                 var loggedBackend = false
+                var lastPause: Any? = null
                 progress.collectLatest { p ->
                     if (!loggedBackend && p.activeBackend != null) {
-                        Log.i(TAG, "job=$jobId backend=${p.activeBackend}")
+                        AppLog.i(TAG, "job=$jobId backend=${p.activeBackend}")
                         loggedBackend = true
+                    }
+                    if (p.pausedReason != lastPause) {
+                        AppLog.i(TAG, "job=$jobId paused=${p.pausedReason}")
+                        lastPause = p.pausedReason
                     }
                     val now = SystemClock.elapsedRealtime()
                     if (now - lastUpdate >= 1000 || p.pausedReason != null) {
@@ -82,13 +87,14 @@ class VideoUpscaleWorker(context: Context, params: WorkerParameters) : Coroutine
                 Result.success()
             } catch (e: CancellationException) {
                 // Stopped by WorkManager (constraints, quota): WorkManager retries; show the job as queued meanwhile.
+                AppLog.w(TAG, "job=$jobId stopped by WorkManager (stopReason=${if (Build.VERSION.SDK_INT >= 31) stopReason else "?"})")
                 withContext(NonCancellable) {
                     repository.get(jobId)?.takeIf { it.status.isActive }?.let { repository.save(it.copy(status = JobStatus.QUEUED)) }
                     progress.value = progress.value.copy(status = JobStatus.QUEUED, etaMillis = null, pausedReason = null)
                 }
                 throw e
             } catch (e: Throwable) {
-                Log.e(TAG, "job=$jobId failed", e)
+                AppLog.e(TAG, "job=$jobId failed", e)
                 repository.get(jobId)?.let { notifyResult(it, success = false) }
                 // Keep the rest of the queue running: failures are recorded in the manifest.
                 Result.success()

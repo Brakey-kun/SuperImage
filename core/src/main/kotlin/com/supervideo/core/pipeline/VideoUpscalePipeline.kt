@@ -9,6 +9,7 @@ import com.supervideo.core.model.ModelStore
 import com.supervideo.core.upscale.NativeError
 import com.supervideo.core.upscale.UpscaleException
 import com.supervideo.core.upscale.UpscaleSession
+import com.supervideo.core.util.AppLog
 import com.supervideo.core.video.FrameDecoder
 import com.supervideo.core.video.PipelineException
 import com.supervideo.core.video.Rational
@@ -73,6 +74,11 @@ class VideoUpscalePipeline(
         val jobDir = repository.jobDir(initial.jobId)
         val state = ManifestState(initial, repository)
         try {
+            AppLog.i(
+                TAG,
+                "Job ${initial.jobId} starting: ${initial.sourceName} ${initial.source.width}x${initial.source.height} " +
+                    "${initial.source.videoCodecName}, ~${initial.estimatedFrames} frames, settings=${initial.settings}",
+            )
             reconcile(state, jobDir)
             val running = state.update { it.copy(status = JobStatus.RUNNING, error = null) }
             progress.value = JobProgress(
@@ -99,6 +105,7 @@ class VideoUpscalePipeline(
             progress.update {
                 it.copy(status = JobStatus.DONE, framesDone = done.framesDone, estimatedFrames = done.framesDone, etaMillis = 0)
             }
+            AppLog.i(TAG, "Job ${done.jobId} done: ${done.framesDone} frames, upscale ${done.upscaleMillis} ms -> $uri")
             return done
         } catch (e: JobCancelledException) {
             return cancelled(state, jobDir, progress)
@@ -117,11 +124,13 @@ class VideoUpscalePipeline(
     }
 
     private fun fail(state: ManifestState, e: Throwable, progress: MutableStateFlow<JobProgress>) {
+        AppLog.e(TAG, "Job ${state.value.jobId} failed after ${state.value.framesDone} frames", e)
         state.update { it.copy(status = JobStatus.FAILED, error = e.message ?: e.javaClass.simpleName) }
         progress.update { it.copy(status = JobStatus.FAILED, etaMillis = null, pausedReason = null) }
     }
 
     private fun cancelled(state: ManifestState, jobDir: File, progress: MutableStateFlow<JobProgress>): JobManifest {
+        AppLog.i(TAG, "Job ${state.value.jobId} cancelled after ${state.value.framesDone} frames")
         dropPartialSegments(state, jobDir)
         val result = state.update { it.copy(status = JobStatus.CANCELLED) }
         progress.update { it.copy(status = JobStatus.CANCELLED, etaMillis = null, pausedReason = null) }
@@ -356,5 +365,6 @@ class VideoUpscalePipeline(
 
     companion object {
         const val OUTPUT_FILE = "output.mp4"
+        private const val TAG = "Pipeline"
     }
 }

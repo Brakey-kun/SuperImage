@@ -17,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.supervideo.core.settings.ThemeMode
+import com.supervideo.core.util.AppLog
+import com.supervideo.ui.mono.MonoButton
 import com.supervideo.ui.AppGraph
 import com.supervideo.ui.form.LabeledDropdown
 import com.supervideo.ui.form.Section
@@ -67,6 +69,17 @@ fun SettingsScreen(graph: AppGraph) {
             Text("Default job settings", style = MaterialTheme.typography.headlineSmall)
             UpscaleSettingsForm(settings.defaultUpscale) { upscale ->
                 graph.settingsStore.update { it.copy(defaultUpscale = upscale) }
+            }
+
+            Section("Logs") {
+                Text(
+                    "Errors, backend selection and job progress are recorded here. Attach these logs when reporting a problem.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                KeyValue("Log folder", AppLog.logDir?.absolutePath ?: "not initialised")
+                MonoButton(onClick = graph.platformUi::openLogs) {
+                    Text(graph.platformUi.logsActionLabel)
+                }
             }
 
             Section("About") {

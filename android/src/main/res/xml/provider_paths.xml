@@ -2,4 +2,6 @@
 <paths>
     <!-- Pre-Android 10 outputs in Movies/SuperVideo -->
     <external-path name="external_files" path="." />
+    <!-- Log bundle shared from Settings -->
+    <cache-path name="logs" path="logs/" />
 </paths>

@@ -8,6 +8,7 @@ import com.supervideo.core.job.JobDraft
 import com.supervideo.core.job.JobRepository
 import com.supervideo.core.preview.PreviewResult
 import com.supervideo.core.settings.UpscaleSettings
+import com.supervideo.core.util.AppLog
 import com.supervideo.core.util.Durations
 import com.supervideo.core.video.VideoInfo
 import com.supervideo.core.video.VideoProbe
@@ -62,12 +63,14 @@ class AppState(private val graph: AppGraph, private val scope: CoroutineScope) {
                         PickedSource(uri, displayName.ifBlank { opened.displayName }, VideoProbe.probe(opened.path))
                     }
                 }
+                AppLog.i(TAG, "Picked ${picked.displayName}: ${picked.info}")
                 source = picked
                 trimStart = ""
                 trimEnd = ""
                 preview = null
                 previewAtUs = picked.info.durationUs / 2
             } catch (e: Throwable) {
+                AppLog.e(TAG, "Cannot open video $uri", e)
                 homeError = "Cannot open video: ${e.message}"
             } finally {
                 probing = false
@@ -116,6 +119,7 @@ class AppState(private val graph: AppGraph, private val scope: CoroutineScope) {
                 graph.jobRunner.enqueue(JobDraft(picked.uri, picked.displayName, picked.info, settings, outputTarget))
                 screen = Screen.Jobs
             } catch (e: Throwable) {
+                AppLog.e(TAG, "Cannot start job for ${picked.displayName}", e)
                 homeError = "Cannot start job: ${e.message}"
             } finally {
                 starting = false
@@ -145,10 +149,15 @@ class AppState(private val graph: AppGraph, private val scope: CoroutineScope) {
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Throwable) {
+                AppLog.e(TAG, "Preview failed at ${previewAtUs} us with $draft", e)
                 previewError = e.message ?: e.javaClass.simpleName
             } finally {
                 rendering = false
             }
         }
+    }
+
+    private companion object {
+        const val TAG = "UI"
     }
 }

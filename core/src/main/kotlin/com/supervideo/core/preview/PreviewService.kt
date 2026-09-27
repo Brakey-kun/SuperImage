@@ -9,6 +9,7 @@ import com.supervideo.core.video.PipelineException
 import com.supervideo.core.video.Rational
 import com.supervideo.core.video.VideoInfo
 import com.supervideo.core.video.allocateFrameBuffer
+import com.supervideo.core.util.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
@@ -65,6 +66,10 @@ class PreviewService(private val modelStore: ModelStore) {
                 // second pass when that is cheap enough; slow models report the single cold pass.
                 val first = timedUpscale()
                 val ms = if (first < WARM_UP_LIMIT_MS) timedUpscale() else first
+                AppLog.i(
+                    "Preview",
+                    "${settings.model.id} ${width}x$height on ${session.activeBackend}: cold ${first} ms, reported $ms ms",
+                )
                 PreviewResult(
                     originalRgba = frame,
                     width = width,

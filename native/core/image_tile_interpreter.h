@@ -22,6 +22,7 @@ enum NativeError {
     Cancelled = 4,
     BufferTooSmall = 5,
     ModelScaleMismatch = 6,
+    NativeException = 7,
 };
 
 class ImageTileInterpreterException : public std::exception {

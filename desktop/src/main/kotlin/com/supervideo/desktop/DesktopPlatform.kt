@@ -7,6 +7,8 @@ import com.supervideo.core.platform.OpenedSource
 import com.supervideo.core.platform.Platform
 import com.supervideo.core.platform.StagedSource
 import com.supervideo.core.upscale.NativeLibraryLoader
+import com.supervideo.core.upscale.NativeUpscaler
+import com.supervideo.core.util.AppLog
 import com.supervideo.core.util.moveTo
 import java.awt.Desktop
 import java.io.File
@@ -24,8 +26,19 @@ class DesktopPlatform : Platform {
         "SuperVideo",
     ).apply { mkdirs() }
 
+    val logDir: File = File(dataDir, "logs")
+
     override val nativeLoader = NativeLibraryLoader {
         System.load(File(resourcesDir, "realesrgan.dll").absolutePath)
+        // MNN reports backend/driver problems on native stdout/stderr, invisible in a GUI app. The redirect
+        // covers the whole process's stdout/stderr, so console.log also interleaves the app log echo.
+        val consoleLog = File(logDir, CONSOLE_LOG)
+        if (consoleLog.length() > MAX_CONSOLE_LOG_BYTES) {
+            File(logDir, "console.1.log").let { it.delete(); consoleLog.renameTo(it) }
+        }
+        logDir.mkdirs()
+        val redirected = NativeUpscaler.redirectNativeOutput(consoleLog.absolutePath)
+        AppLog.i("Native", "Loaded realesrgan.dll; native output ${if (redirected) "-> ${consoleLog.name}" else "not redirected"}")
     }
 
     override val modelStore = ModelStore { model -> File(resourcesDir, "models/${model.fileName}").readBytes() }
@@ -60,4 +73,9 @@ class DesktopPlatform : Platform {
     }
 
     override fun gate(): PipelineGate = PipelineGate.ALWAYS_RUN
+
+    private companion object {
+        const val CONSOLE_LOG = "console.log"
+        const val MAX_CONSOLE_LOG_BYTES = 1L shl 20
+    }
 }

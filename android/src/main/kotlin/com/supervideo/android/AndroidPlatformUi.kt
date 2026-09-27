@@ -17,13 +17,46 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.documentfile.provider.DocumentFile
+import androidx.core.content.FileProvider
 import com.supervideo.BuildConfig
+import com.supervideo.core.util.AppLog
 import com.supervideo.ui.PlatformUi
 import java.nio.ByteBuffer
+import java.io.File
 
 class AndroidPlatformUi(private val activity: Activity) : PlatformUi {
 
     override val versionName: String = BuildConfig.VERSION_NAME
+
+    override val logsActionLabel: String = "Share logs"
+
+    /** Shares the app log plus this process's logcat (MNN/FFmpeg native output) as one text file. */
+    override fun openLogs() {
+        Thread {
+            runCatching {
+                val dir = File(activity.cacheDir, "logs").apply { mkdirs() }
+                val file = File(dir, "supervideo-logs.txt")
+                val logcat = runCatching {
+                    ProcessBuilder("logcat", "-d", "-v", "threadtime", "--pid=${android.os.Process.myPid()}")
+                        .redirectErrorStream(true)
+                        .start()
+                        .inputStream.bufferedReader().use { it.readText() }
+                }.getOrElse { "logcat unavailable: $it" }
+                file.writeText(
+                    "SuperVideo ${BuildConfig.VERSION_NAME} on ${Build.MANUFACTURER} ${Build.MODEL}, " +
+                        "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), ${Build.SUPPORTED_ABIS.joinToString()}\n\n" +
+                        "==== app log ====\n${AppLog.collect()}\n\n==== logcat (this process) ====\n$logcat",
+                )
+                val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", file)
+                val send = Intent(Intent.ACTION_SEND)
+                    .setType("text/plain")
+                    .putExtra(Intent.EXTRA_STREAM, uri)
+                    .putExtra(Intent.EXTRA_SUBJECT, "SuperVideo logs")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                activity.runOnUiThread { activity.startActivity(Intent.createChooser(send, "Share logs")) }
+            }.onFailure { AppLog.e("UI", "Sharing logs failed", it) }
+        }.start()
+    }
 
     @Composable
     override fun rememberVideoPicker(onPicked: (uri: String, displayName: String) -> Unit): () -> Unit {

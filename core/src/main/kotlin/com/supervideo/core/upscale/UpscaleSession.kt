@@ -1,6 +1,7 @@
 package com.supervideo.core.upscale
 
 import com.supervideo.core.settings.UpscaleSettings
+import com.supervideo.core.util.AppLog
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -10,7 +11,8 @@ enum class NativeError(val code: Int, val message: String) {
     INVALID_ARGS(3, "Invalid tile size / padding / frame size"),
     CANCELLED(4, "Cancelled"),
     BUFFER_TOO_SMALL(5, "Frame buffer too small"),
-    MODEL_SCALE_MISMATCH(6, "Model scale does not match its output size");
+    MODEL_SCALE_MISMATCH(6, "Model scale does not match its output size"),
+    NATIVE_EXCEPTION(7, "Unexpected native error");
 
     companion object {
         fun fromCode(code: Int): NativeError? = entries.firstOrNull { it.code == code }
@@ -64,13 +66,17 @@ class UpscaleSession private constructor(
      * @throws UpscaleException on failure, with [NativeError.CANCELLED] when [cancel] was set.
      */
     fun upscale(input: ByteBuffer, output: ByteBuffer, cancel: AtomicBoolean) {
-        check(handle > 0) { "Session closed" }
+        check(handle != 0L) { "Session closed" }
         val result = NativeUpscaler.upscaleFrame(handle, input, output, cancel)
-        if (result != 0) throw UpscaleException(NativeError.fromCode(result), result)
+        if (result != 0) {
+            val error = UpscaleException(NativeError.fromCode(result), result)
+            if (error.error != NativeError.CANCELLED) AppLog.e(TAG, "Frame upscale failed (native code $result)", error)
+            throw error
+        }
     }
 
     override fun close() {
-        if (handle > 0) {
+        if (handle != 0L) {
             NativeUpscaler.destroySession(handle)
             handle = 0
         }
@@ -79,6 +85,11 @@ class UpscaleSession private constructor(
     companion object {
         /** @throws UpscaleException when the model or backend cannot be initialised. */
         fun open(model: ByteArray, modelScale: Int, width: Int, height: Int, settings: UpscaleSettings): UpscaleSession {
+            val request = "model ${model.size} B ×$modelScale, frame ${width}x$height, " +
+                "tile ${settings.effectiveTileSize}/pad ${settings.tilePadding}, " +
+                "backend ${settings.backend}, precision ${settings.precision}, threads ${settings.threads}"
+            AppLog.i(TAG, "Opening session: $request")
+            val errorOut = IntArray(1)
             val handle = NativeUpscaler.createSession(
                 model = model,
                 scale = modelScale,
@@ -89,13 +100,19 @@ class UpscaleSession private constructor(
                 backend = settings.backend.nativeValue,
                 precision = settings.precision.nativeValue,
                 threads = settings.threads,
+                errorOut = errorOut,
             )
-            if (handle <= 0) {
-                val code = (-handle).toInt()
-                throw UpscaleException(NativeError.fromCode(code), code)
+            if (handle == 0L) {
+                val code = errorOut[0]
+                val error = UpscaleException(NativeError.fromCode(code), code)
+                AppLog.e(TAG, "Session failed (native code $code): $request", error)
+                throw error
             }
             val backend = Backend.fromMnnForwardType(NativeUpscaler.activeBackend(handle))
+            AppLog.i(TAG, "Session ready on $backend")
             return UpscaleSession(handle, width, height, modelScale, backend)
         }
+
+        private const val TAG = "Upscale"
     }
 }

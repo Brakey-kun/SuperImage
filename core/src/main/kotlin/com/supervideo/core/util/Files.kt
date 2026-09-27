@@ -29,13 +29,36 @@ fun File.writeTextAtomically(text: String) {
     }
 }
 
-/**
- * Replaces [target] with [this]. Uses File.renameTo (java.nio.file needs Android API 26);
- * Windows won't rename over an existing file, so the target is deleted and the rename retried,
- * then falls back to copy + delete across filesystems.
- */
+/** Replaces [target] with [this]: atomic when the filesystem allows it, copy + delete across filesystems. */
 fun File.moveTo(target: File) {
     target.parentFile?.mkdirs()
+    try {
+        NioMove.move(this, target)
+    } catch (e: NoClassDefFoundError) {
+        // java.nio.file is missing below Android API 26: rename is atomic on Android's filesystems.
+        legacyMove(target)
+    }
+}
+
+/** Isolated so that java.nio.file classes are only resolved when this is called. */
+private object NioMove {
+    fun move(source: File, target: File) {
+        val from = source.toPath()
+        val to = target.toPath()
+        try {
+            java.nio.file.Files.move(
+                from, to,
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+            )
+        } catch (e: IOException) {
+            // AtomicMoveNotSupportedException (e.g. across filesystems) and similar: plain replace.
+            java.nio.file.Files.move(from, to, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+}
+
+private fun File.legacyMove(target: File) {
     if (renameTo(target)) return
     if (target.exists() && !target.delete()) throw IOException("cannot replace $target")
     if (renameTo(target)) return
