@@ -8,6 +8,8 @@ Video in → streaming decode → per-frame Real-ESRGAN upscale (MNN, Vulkan/Ope
 encode in checkpointed segments → MP4 with the source audio stream-copied and every frame
 timestamp preserved (VFR included).
 
+And I already said it, but UP UP UP, it's an android video upscaler xD
+
 ## Features
 
 - Models: Real-ESRGAN general v3 ×2/×4 and anime video v3 ×4 (fast, SRVGG), plus the RRDB
