@@ -1,6 +1,7 @@
 # SuperVideo
 
-AI video upscaler for Android (arm64) and Windows (x64), forked from
+Just a fun little project,
+an AI video upscaler for Android (arm64) and Windows (x64), forked from
 [SuperImage](https://github.com/Lucchetto/SuperImage).
 
 Video in → streaming decode → per-frame Real-ESRGAN upscale (MNN, Vulkan/OpenCL/CPU) → H.264/HEVC
