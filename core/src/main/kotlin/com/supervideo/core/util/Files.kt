@@ -34,8 +34,9 @@ fun File.moveTo(target: File) {
     target.parentFile?.mkdirs()
     try {
         NioMove.move(this, target)
-    } catch (e: NoClassDefFoundError) {
-        // java.nio.file is missing below Android API 26: rename is atomic on Android's filesystems.
+    } catch (e: LinkageError) {
+        // Below Android API 26 File.toPath() (NoSuchMethodError) and java.nio.file (NoClassDefFoundError)
+        // are missing; both are LinkageErrors. rename is atomic on Android's filesystems.
         legacyMove(target)
     }
 }

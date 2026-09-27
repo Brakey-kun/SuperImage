@@ -30,14 +30,16 @@ class AndroidPlatformUi(private val activity: Activity) : PlatformUi {
 
     override val logsActionLabel: String = "Share logs"
 
-    /** Shares the app log plus this process's logcat (MNN/FFmpeg native output) as one text file. */
+    /** Shares the app log plus this app's logcat (incl. MNN native output and crash buffer) as one text file. */
     override fun openLogs() {
         Thread {
             runCatching {
                 val dir = File(activity.cacheDir, "logs").apply { mkdirs() }
                 val file = File(dir, "supervideo-logs.txt")
                 val logcat = runCatching {
-                    ProcessBuilder("logcat", "-d", "-v", "threadtime", "--pid=${android.os.Process.myPid()}")
+                    // No --pid: native crashes kill the process, so the failing run has another PID. Apps can
+                    // only read their own UID's entries, so this stays private and includes previous runs.
+                    ProcessBuilder("logcat", "-d", "-v", "threadtime", "-b", "main,system,crash")
                         .redirectErrorStream(true)
                         .start()
                         .inputStream.bufferedReader().use { it.readText() }
@@ -45,7 +47,7 @@ class AndroidPlatformUi(private val activity: Activity) : PlatformUi {
                 file.writeText(
                     "SuperVideo ${BuildConfig.VERSION_NAME} on ${Build.MANUFACTURER} ${Build.MODEL}, " +
                         "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), ${Build.SUPPORTED_ABIS.joinToString()}\n\n" +
-                        "==== app log ====\n${AppLog.collect()}\n\n==== logcat (this process) ====\n$logcat",
+                        "==== app log ====\n${AppLog.collect()}\n\n==== logcat (this app, incl. previous runs) ====\n$logcat",
                 )
                 val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", file)
                 val send = Intent(Intent.ACTION_SEND)
